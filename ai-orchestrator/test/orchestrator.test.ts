@@ -51,7 +51,8 @@ const humanMessage: ChatMessage = {
   participantId: 'user-1',
   displayName: 'Taylor',
   content: 'hello there',
-  createdAt: new Date().toISOString()
+  createdAt: new Date().toISOString(),
+  replyDepth: 0
 };
 
 const memories: BotMemory[] = [
@@ -96,5 +97,36 @@ describe('orchestrator', () => {
 
     expect(decision.shouldRespond).toBe(false);
     expect(decision.reason).toBe('prevent-bot-loop');
+  });
+
+  it('records which message the bot is replying to', async () => {
+    const orchestrator = new Orchestrator(new RecordingProvider());
+    const plan = await orchestrator.createReplyPlan({
+      bot,
+      incomingMessage: {
+        ...humanMessage,
+        participantId: 'bot-2',
+        replyDepth: 2
+      },
+      roomId: 'lobby'
+    });
+
+    expect(plan?.message.replyToMessageId).toBe('m-1');
+  });
+
+  it('stops replying when the since-last-human ai cap is reached', async () => {
+    const orchestrator = new Orchestrator(new RecordingProvider());
+    const plan = await orchestrator.createReplyPlan({
+      bot,
+      incomingMessage: {
+        ...humanMessage,
+        participantId: 'bot-2',
+        replyDepth: 3
+      },
+      roomId: 'lobby',
+      maxAiResponses: 3
+    });
+
+    expect(plan).toBeNull();
   });
 });

@@ -60,7 +60,7 @@ export class Orchestrator {
     return new Orchestrator(new OllamaProvider());
   }
 
-  decide(bot: Participant, message: ChatMessage): BotDecision {
+  decide(bot: Participant, message: ChatMessage, maxAiResponses = 1000): BotDecision {
     if (bot.kind !== 'bot' || !bot.botProfile) {
       return { shouldRespond: false, reason: 'not-a-bot', delayMs: 0 };
     }
@@ -71,6 +71,10 @@ export class Orchestrator {
 
     if (message.participantId === bot.id) {
       return { shouldRespond: false, reason: 'prevent-bot-loop', delayMs: 0 };
+    }
+
+    if (message.replyDepth >= maxAiResponses) {
+      return { shouldRespond: false, reason: 'max-ai-replies-reached', delayMs: 0 };
     }
 
     return {
@@ -85,8 +89,9 @@ export class Orchestrator {
     incomingMessage: ChatMessage;
     roomId: string;
     memories?: BotMemory[];
+    maxAiResponses?: number;
   }): Promise<BotReplyPlan | null> {
-    const decision = this.decide(args.bot, args.incomingMessage);
+    const decision = this.decide(args.bot, args.incomingMessage, args.maxAiResponses ?? 1000);
 
     if (!decision.shouldRespond || !args.bot.botProfile) {
       return null;
@@ -108,7 +113,9 @@ export class Orchestrator {
         participantId: args.bot.id,
         displayName: args.bot.displayName,
         content: response.reply,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        replyDepth: args.incomingMessage.replyDepth + 1,
+        replyToMessageId: args.incomingMessage.id
       },
       newMemories: response.newMemories
     };
