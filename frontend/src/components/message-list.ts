@@ -5,7 +5,66 @@ export function createMessageList(): HTMLElement {
   container.className = 'message-list';
   container.setAttribute('role', 'log');
   container.setAttribute('aria-live', 'polite');
+
+  const typingIndicator = createTypingIndicator();
+  container.appendChild(typingIndicator);
+
   return container;
+}
+
+function createTypingIndicator(): HTMLElement {
+  const indicator = document.createElement('div');
+  indicator.className = 'typing-indicator';
+  indicator.setAttribute('aria-live', 'polite');
+  indicator.setAttribute('aria-atomic', 'true');
+  indicator.hidden = true;
+  indicator.innerHTML = `
+    <span class="typing-indicator__dots">
+      <span class="typing-indicator__dot"></span>
+      <span class="typing-indicator__dot"></span>
+      <span class="typing-indicator__dot"></span>
+    </span>
+    <span class="typing-indicator__text"></span>
+  `;
+  return indicator;
+}
+
+export function updateTypingIndicator(
+  container: HTMLElement,
+  typingParticipants: Set<string>,
+  participants: { id: string; displayName: string }[]
+): void {
+  const indicator = container.querySelector<HTMLElement>('.typing-indicator');
+  if (!indicator) return;
+
+  const textEl = indicator.querySelector<HTMLElement>('.typing-indicator__text');
+
+  if (typingParticipants.size === 0) {
+    indicator.hidden = true;
+    if (textEl) textEl.textContent = '';
+    return;
+  }
+
+  const names = Array.from(typingParticipants)
+    .map(id => participants.find(p => p.id === id)?.displayName)
+    .filter((name): name is string => name !== undefined);
+
+  if (names.length === 0) {
+    indicator.hidden = true;
+    return;
+  }
+
+  indicator.hidden = false;
+
+  if (textEl) {
+    if (names.length === 1) {
+      textEl.textContent = `${names[0]} is typing...`;
+    } else if (names.length === 2) {
+      textEl.textContent = `${names[0]} and ${names[1]} are typing...`;
+    } else {
+      textEl.textContent = `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]} are typing...`;
+    }
+  }
 }
 
 export function updateMessageList(

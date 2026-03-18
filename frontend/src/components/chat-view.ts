@@ -1,6 +1,6 @@
 import type { AppState } from '../state.js';
 import { createParticipantList, updateParticipantList } from './participant-list.js';
-import { createMessageList, updateMessageList, clearMessageList } from './message-list.js';
+import { createMessageList, updateMessageList, clearMessageList, updateTypingIndicator } from './message-list.js';
 import { createComposer, type ComposerCallbacks } from './composer.js';
 import { createThemeToggle } from './theme-toggle.js';
 import type { SendMessagePayload } from '../types.js';
@@ -112,6 +112,7 @@ export function updateChatView(
   const messageList = queryElement<HTMLElement>(container, '.message-list');
   if (messageList) {
     updateMessageList(messageList, state.messages, currentUserId);
+    updateTypingIndicator(messageList, state.typingParticipants, state.participants);
   }
 
   const memoryBtn = container.querySelector<HTMLButtonElement>('#memory-inspector-btn');
