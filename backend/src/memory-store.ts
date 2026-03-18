@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import { botMemorySchema, type BotMemory, type NewMemoryDraft } from 'shared';
 
+import { resolveDataSubdir } from './storage-path.js';
+
 const DEFAULT_MEMORY_LIMIT = 8;
 
 interface AppendMemoryArgs {
@@ -14,7 +16,7 @@ interface AppendMemoryArgs {
 }
 
 export class MemoryStore {
-  constructor(private readonly baseDir = path.resolve(process.cwd(), 'data/memories')) {}
+  constructor(private readonly baseDir = resolveDataSubdir('memories')) {}
 
   async getRecentMemories(memoryKey: string, limit = DEFAULT_MEMORY_LIMIT): Promise<BotMemory[]> {
     const memories = await this.getAllMemories(memoryKey);

@@ -7,7 +7,7 @@ import { attachWebSockets } from './ws.js';
 async function start() {
   const store = new RoomStore();
   const memoryStore = new MemoryStore();
-  const app = await createHttpServer(memoryStore);
+  const app = await createHttpServer(memoryStore, store);
 
   attachWebSockets(app, app.server, store, memoryStore);
 
