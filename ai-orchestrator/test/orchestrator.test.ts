@@ -69,6 +69,19 @@ const memories: BotMemory[] = [
   }
 ];
 
+const recentMessages: ChatMessage[] = [
+  {
+    id: 'm-0',
+    roomId: 'lobby',
+    participantId: 'user-2',
+    displayName: 'Jordan',
+    content: 'We were talking about travel plans.',
+    createdAt: new Date().toISOString(),
+    replyDepth: 0
+  },
+  humanMessage
+];
+
 describe('orchestrator', () => {
   it('creates a bot reply plan for a human message', async () => {
     const provider = new RecordingProvider();
@@ -77,13 +90,16 @@ describe('orchestrator', () => {
       bot,
       incomingMessage: humanMessage,
       roomId: 'lobby',
-      memories
+      memories,
+      recentMessages
     });
 
     expect(plan).not.toBeNull();
     expect(plan?.message.displayName).toBe('Orbit');
     expect(plan?.message.content).toContain('hello there');
     expect(plan?.newMemories).toHaveLength(1);
+    expect(provider.systemPrompt).toContain('Recent conversation (latest 10 messages):');
+    expect(provider.systemPrompt).toContain('Jordan: We were talking about travel plans.');
     expect(provider.systemPrompt).toContain('Known memories for this bot:');
     expect(provider.systemPrompt).toContain('Taylor likes short answers.');
   });

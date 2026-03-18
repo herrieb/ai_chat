@@ -39,10 +39,23 @@ function formatMemories(memories: BotMemory[]): string {
   ].join('\n');
 }
 
-function buildSystemPrompt(bot: Participant, memories: BotMemory[]): string {
+function formatRecentMessages(messages: ChatMessage[]): string {
+  if (messages.length === 0) {
+    return 'Recent conversation: none yet.';
+  }
+
+  return [
+    'Recent conversation (latest 10 messages):',
+    ...messages.map((message) => `- ${message.displayName}: ${message.content}`)
+  ].join('\n');
+}
+
+function buildSystemPrompt(bot: Participant, memories: BotMemory[], recentMessages: ChatMessage[]): string {
   return [
     `You are ${bot.displayName}, a chat participant with the personality: ${bot.botProfile?.personality}.`,
+    'Use the recent conversation to understand what people are discussing right now before you reply.',
     'The memory section contains durable notes from prior conversation. Use them only when relevant, and do not mention that they came from memory unless natural.',
+    formatRecentMessages(recentMessages),
     formatMemories(memories),
     'Return strict JSON with this shape only: {"reply":"short natural chat reply","newMemories":[{"fact":"stable useful fact","kind":"identity|preference|relationship|goal|fact","importance":0.0}]}.',
     'Only add new memories for durable, useful facts worth keeping for later conversations. Keep the chat reply concise and human.'
@@ -89,6 +102,7 @@ export class Orchestrator {
     incomingMessage: ChatMessage;
     roomId: string;
     memories?: BotMemory[];
+    recentMessages?: ChatMessage[];
     maxAiResponses?: number;
   }): Promise<BotReplyPlan | null> {
     const decision = this.decide(args.bot, args.incomingMessage, args.maxAiResponses ?? 1000);
@@ -98,7 +112,7 @@ export class Orchestrator {
     }
 
     const response = await this.provider.generate({
-      systemPrompt: buildSystemPrompt(args.bot, args.memories ?? []),
+      systemPrompt: buildSystemPrompt(args.bot, args.memories ?? [], args.recentMessages ?? []),
       userPrompt: args.incomingMessage.content,
       model: args.bot.botProfile.model,
       baseUrl: args.bot.botProfile.ollamaUrl,
