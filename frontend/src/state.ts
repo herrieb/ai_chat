@@ -15,6 +15,7 @@ export interface AppState {
   messages: ChatMessage[];
   ownedBot: OwnedBotInfo | null;
   isOwner: boolean;
+  typingParticipants: Set<string>;
 }
 
 export function createInitialState(): AppState {
@@ -25,7 +26,8 @@ export function createInitialState(): AppState {
     participants: [],
     messages: [],
     ownedBot: null,
-    isOwner: false
+    isOwner: false,
+    typingParticipants: new Set()
   };
 }
 
@@ -36,5 +38,24 @@ export function updateStateFromRoomState(state: AppState, room: RoomState, owner
     participants: room.participants,
     messages: room.messages,
     isOwner: room.ownerDisplayName === ownerDisplayName
+  };
+}
+
+export interface TypingUpdate {
+  participantId: string;
+  displayName: string;
+  isTyping: boolean;
+}
+
+export function updateTypingState(state: AppState, update: TypingUpdate): AppState {
+  const newTypingParticipants = new Set(state.typingParticipants);
+  if (update.isTyping) {
+    newTypingParticipants.add(update.participantId);
+  } else {
+    newTypingParticipants.delete(update.participantId);
+  }
+  return {
+    ...state,
+    typingParticipants: newTypingParticipants
   };
 }

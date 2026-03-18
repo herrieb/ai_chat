@@ -1,5 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
-import type { JoinRoomPayload, RoomState, SendMessagePayload, BotErrorEvent, OllamaHealthResponse, OllamaModelsResponse, MemoryLedgerResponse, BotRetryPayload, OllamaConnectionConfig, CloseRoomPayload, RoomClosedEvent, RoomListResponse } from './types.js';
+import type { JoinRoomPayload, RoomState, SendMessagePayload, BotErrorEvent, OllamaHealthResponse, OllamaModelsResponse, MemoryLedgerResponse, BotRetryPayload, OllamaConnectionConfig, CloseRoomPayload, RoomClosedEvent, RoomListResponse, TypingEvent } from './types.js';
 
 let socket: Socket | null = null;
 
@@ -105,4 +105,10 @@ export async function fetchRooms(): Promise<RoomListResponse> {
 export function disconnect(): void {
   socket?.disconnect();
   socket = null;
+}
+
+export function onParticipantTyping(handler: (event: TypingEvent) => void): () => void {
+  const sock = getSocket();
+  sock.on('participant:typing', handler);
+  return () => sock.off('participant:typing', handler);
 }

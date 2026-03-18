@@ -5,8 +5,8 @@ import { createJoinForm } from './components/join-form.js';
 import { createErrorNoticeContainer, createErrorNotice, addErrorNotice, removeErrorNotice, type ErrorNoticeCallbacks } from './components/error-notification.js';
 import { createMemoryInspector, showMemoryInspector, hideMemoryInspector } from './components/memory-inspector.js';
 import type { AppState, RoomState, OwnedBotInfo } from './state.js';
-import { createInitialState, updateStateFromRoomState } from './state.js';
-import { joinRoom, sendMessage, onRoomState, onBotError, retryBot, closeRoom, onRoomClosed } from './socket.js';
+import { createInitialState, updateStateFromRoomState, updateTypingState } from './state.js';
+import { joinRoom, sendMessage, onRoomState, onBotError, retryBot, closeRoom, onRoomClosed, onParticipantTyping } from './socket.js';
 import { applyTheme, getStoredTheme } from './theme.js';
 import type { JoinRoomPayload, SendMessagePayload, BotErrorEvent, RoomClosedEvent } from './types.js';
 
@@ -133,9 +133,23 @@ function init(): void {
     addErrorNotice(errorContainer, notice);
   });
 
+  const unsubscribeTyping = onParticipantTyping((event) => {
+    if (event.roomId !== currentRoomId) {
+      return;
+    }
+
+    state = updateTypingState(state, {
+      participantId: event.participantId,
+      displayName: event.displayName,
+      isTyping: event.isTyping
+    });
+    updateChatView(chatView, state, setComposerRoom);
+  });
+
   window.addEventListener('beforeunload', () => {
     unsubscribeRoom();
     unsubscribeBotError();
+    unsubscribeTyping();
     unsubscribeRoomClosed();
   });
 
