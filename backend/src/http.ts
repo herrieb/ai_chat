@@ -2,6 +2,7 @@ import fastify from 'fastify';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { env } from './config.js';
 import { MemoryStore } from './memory-store.js';
@@ -9,12 +10,15 @@ import { memoryLedgerResponseSchema, ollamaConnectionConfigSchema, ollamaHealthR
 import { OllamaProvider } from 'ai-orchestrator';
 import { RoomStore } from './store.js';
 
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const publicDir = path.resolve(currentDir, '../public');
+
 export async function createHttpServer(memoryStore: MemoryStore, roomStore: RoomStore) {
   const app = fastify();
   const ollama = new OllamaProvider(env.OLLAMA_URL, env.OLLAMA_TOKEN);
   await app.register(cors, { origin: true });
   await app.register(fastifyStatic, {
-    root: path.resolve(process.cwd(), 'public'),
+    root: publicDir,
     prefix: '/'
   });
 
