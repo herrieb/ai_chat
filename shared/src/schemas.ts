@@ -30,7 +30,9 @@ export const chatMessageSchema = z.object({
   participantId: z.string().min(1),
   displayName: z.string().min(1),
   content: z.string().min(1),
-  createdAt: z.string().datetime()
+  createdAt: z.string().datetime(),
+  replyDepth: z.number().int().nonnegative(),
+  replyToMessageId: z.string().min(1).optional()
 });
 
 export const roomStateSchema = z.object({
@@ -38,6 +40,7 @@ export const roomStateSchema = z.object({
   ownerKey: z.string().min(1),
   ownerDisplayName: z.string().min(1),
   status: z.enum(['active', 'paused', 'closed']),
+  maxAiResponses: z.number().int().min(1).max(1000),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   participants: z.array(participantSchema),
@@ -48,6 +51,7 @@ export const publicRoomStateSchema = z.object({
   roomId: z.string().min(1),
   ownerDisplayName: z.string().min(1),
   status: z.enum(['active', 'paused', 'closed']),
+  maxAiResponses: z.number().int().min(1).max(1000),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   participants: z.array(participantSchema),
@@ -58,6 +62,7 @@ export const roomSummarySchema = z.object({
   roomId: z.string().min(1),
   ownerDisplayName: z.string().min(1),
   status: z.enum(['active', 'paused', 'closed']),
+  maxAiResponses: z.number().int().min(1).max(1000),
   participantCount: z.number().int().nonnegative(),
   humanCount: z.number().int().nonnegative(),
   botCount: z.number().int().nonnegative(),
@@ -74,6 +79,7 @@ export const joinRoomPayloadSchema = z.object({
   ollamaUrl: z.string().url(),
   ollamaToken: z.string().trim().min(1).optional(),
   personality: z.string().min(1),
+  maxAiResponses: z.number().int().min(1).max(1000).optional(),
   theme: z.enum(['light', 'dark'])
 });
 
@@ -149,4 +155,11 @@ export const roomListResponseSchema = z.object({
 
 export const roomClosedEventSchema = z.object({
   roomId: z.string().min(1)
+});
+
+export const typingEventSchema = z.object({
+  roomId: z.string().min(1),
+  participantId: z.string().min(1),
+  displayName: z.string().min(1),
+  isTyping: z.boolean()
 });

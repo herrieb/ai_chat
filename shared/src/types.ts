@@ -42,6 +42,8 @@ export interface ChatMessage {
   displayName: string;
   content: string;
   createdAt: string;
+  replyDepth: number;
+  replyToMessageId?: string;
 }
 
 export interface RoomState {
@@ -49,6 +51,7 @@ export interface RoomState {
   ownerKey: string;
   ownerDisplayName: string;
   status: RoomStatus;
+  maxAiResponses: number;
   createdAt: string;
   updatedAt: string;
   participants: Participant[];
@@ -59,6 +62,7 @@ export interface PublicRoomState {
   roomId: string;
   ownerDisplayName: string;
   status: RoomStatus;
+  maxAiResponses: number;
   createdAt: string;
   updatedAt: string;
   participants: Participant[];
@@ -69,6 +73,7 @@ export interface RoomSummary {
   roomId: string;
   ownerDisplayName: string;
   status: RoomStatus;
+  maxAiResponses: number;
   participantCount: number;
   humanCount: number;
   botCount: number;
@@ -85,6 +90,7 @@ export interface JoinRoomPayload {
   ollamaUrl: string;
   ollamaToken?: string;
   personality: string;
+  maxAiResponses?: number;
   theme: ThemeMode;
 }
 
@@ -167,4 +173,11 @@ export interface RoomListResponse {
 
 export interface RoomClosedEvent {
   roomId: string;
+}
+
+export interface TypingEvent {
+  roomId: string;
+  participantId: string;
+  displayName: string;
+  isTyping: boolean;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { botErrorEventSchema, botMemorySchema, botRetryPayloadSchema, chatMessageSchema, closeRoomPayloadSchema, joinRoomPayloadSchema, memoryLedgerResponseSchema, ollamaHealthResponseSchema, ollamaModelsResponseSchema, providerResponseSchema, roomClosedEventSchema, roomListResponseSchema } from '../src/schemas.js';
+import { botErrorEventSchema, botMemorySchema, botRetryPayloadSchema, chatMessageSchema, closeRoomPayloadSchema, joinRoomPayloadSchema, memoryLedgerResponseSchema, ollamaHealthResponseSchema, ollamaModelsResponseSchema, providerResponseSchema, roomClosedEventSchema, roomListResponseSchema, typingEventSchema } from '../src/schemas.js';
 
 describe('shared schemas', () => {
   it('accepts a valid join payload', () => {
@@ -22,11 +22,13 @@ describe('shared schemas', () => {
     expect(() =>
       chatMessageSchema.parse({
         id: '1',
-        roomId: 'lobby',
-        participantId: 'u1',
-        displayName: 'Taylor',
-        content: '',
-        createdAt: new Date().toISOString()
+      roomId: 'lobby',
+      participantId: 'u1',
+      displayName: 'Taylor',
+      content: '',
+      createdAt: new Date().toISOString(),
+      replyDepth: 0,
+      replyToMessageId: 'parent-1'
       })
     ).toThrowError();
   });
@@ -120,6 +122,7 @@ describe('shared schemas', () => {
           roomId: 'lobby',
           ownerDisplayName: 'Taylor',
           status: 'active',
+          maxAiResponses: 1000,
           participantCount: 2,
           humanCount: 1,
           botCount: 1,
@@ -134,5 +137,17 @@ describe('shared schemas', () => {
     expect(list.rooms[0]?.roomId).toBe('lobby');
     expect(close.roomId).toBe('lobby');
     expect(closed.roomId).toBe('lobby');
+  });
+
+  it('accepts typing events', () => {
+    const result = typingEventSchema.parse({
+      roomId: 'lobby',
+      participantId: 'bot-1',
+      displayName: 'Orbit',
+      isTyping: true
+    });
+
+    expect(result.displayName).toBe('Orbit');
+    expect(result.isTyping).toBe(true);
   });
 });
