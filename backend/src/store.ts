@@ -29,6 +29,13 @@ function createOwnerKey(roomId: string, displayName: string): string {
   return [roomId, displayName].map(slugify).join('-');
 }
 
+function normalizeRoomState(room: RoomState): RoomState {
+  return {
+    ...room,
+    maxAiResponses: room.maxAiResponses ?? DEFAULT_MAX_AI_RESPONSES
+  };
+}
+
 function makeBot(ownerKey: string, payload: JoinRoomPayload): Participant {
   return {
     id: crypto.randomUUID(),
@@ -74,7 +81,7 @@ export class RoomStore {
   getRoom(roomId: string): RoomState {
     const existing = this.rooms.get(roomId);
     if (existing) {
-      return existing;
+      return normalizeRoomState(existing);
     }
 
     const now = new Date().toISOString();
@@ -89,13 +96,14 @@ export class RoomStore {
       participants: [],
       messages: []
     };
-    this.rooms.set(roomId, room);
-    return room;
+    const normalized = normalizeRoomState(room);
+    this.rooms.set(roomId, normalized);
+    return normalized;
   }
 
   joinRoom(socketId: string, payload: JoinRoomPayload): RoomState {
     const roomId = payload.roomId || DEFAULT_ROOM_ID;
-    const room = this.getRoom(roomId);
+    const room = normalizeRoomState(this.getRoom(roomId));
     if (room.status === 'closed') {
       throw new Error('Room is closed.');
     }
@@ -216,7 +224,9 @@ export class RoomStore {
       }
 
       const filePath = path.join(this.baseDir, entry);
-      const parsed = roomStateSchema.safeParse(JSON.parse(readFileSync(filePath, 'utf8')));
+      const raw = JSON.parse(readFileSync(filePath, 'utf8')) as Partial<RoomState>;
+      const normalized = normalizeRoomState(raw as RoomState);
+      const parsed = roomStateSchema.safeParse(normalized);
       if (parsed.success) {
         this.rooms.set(parsed.data.roomId, parsed.data);
       }
@@ -224,7 +234,7 @@ export class RoomStore {
   }
 
   private saveRoom(room: RoomState): void {
-    writeFileSync(this.getRoomFilePath(room.roomId), JSON.stringify(room, null, 2), 'utf8');
+    writeFileSync(this.getRoomFilePath(room.roomId), JSON.stringify(normalizeRoomState(room), null, 2), 'utf8');
   }
 
   private deleteRoomFile(roomId: string): void {
