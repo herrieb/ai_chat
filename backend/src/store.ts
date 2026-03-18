@@ -81,7 +81,9 @@ export class RoomStore {
   getRoom(roomId: string): RoomState {
     const existing = this.rooms.get(roomId);
     if (existing) {
-      return normalizeRoomState(existing);
+      const normalized = normalizeRoomState(existing);
+      this.rooms.set(roomId, normalized);
+      return normalized;
     }
 
     const now = new Date().toISOString();
@@ -103,7 +105,7 @@ export class RoomStore {
 
   joinRoom(socketId: string, payload: JoinRoomPayload): RoomState {
     const roomId = payload.roomId || DEFAULT_ROOM_ID;
-    const room = normalizeRoomState(this.getRoom(roomId));
+    const room = this.getRoom(roomId);
     if (room.status === 'closed') {
       throw new Error('Room is closed.');
     }
