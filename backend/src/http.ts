@@ -5,10 +5,11 @@ import path from 'node:path';
 
 import { env } from './config.js';
 import { MemoryStore } from './memory-store.js';
-import { memoryLedgerResponseSchema, ollamaConnectionConfigSchema, ollamaHealthResponseSchema, ollamaModelsResponseSchema } from 'shared';
+import { memoryLedgerResponseSchema, ollamaConnectionConfigSchema, ollamaHealthResponseSchema, ollamaModelsResponseSchema, roomListResponseSchema } from 'shared';
 import { OllamaProvider } from 'ai-orchestrator';
+import { RoomStore } from './store.js';
 
-export async function createHttpServer(memoryStore: MemoryStore) {
+export async function createHttpServer(memoryStore: MemoryStore, roomStore: RoomStore) {
   const app = fastify();
   const ollama = new OllamaProvider(env.OLLAMA_URL, env.OLLAMA_TOKEN);
   await app.register(cors, { origin: true });
@@ -45,6 +46,10 @@ export async function createHttpServer(memoryStore: MemoryStore) {
 
     const memories = await memoryStore.getAllMemories(memoryKey);
     return memoryLedgerResponseSchema.parse({ memoryKey, memories });
+  });
+
+  app.get('/api/rooms', async () => {
+    return roomListResponseSchema.parse({ rooms: roomStore.listRooms() });
   });
 
   return app;

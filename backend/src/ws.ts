@@ -4,11 +4,15 @@ import type { Server as HttpServer } from 'node:http';
 import {
   botErrorEventSchema,
   botRetryPayloadSchema,
+  closeRoomPayloadSchema,
   joinRoomPayloadSchema,
+  publicRoomStateSchema,
+  roomClosedEventSchema,
   sendMessagePayloadSchema,
   type BotErrorCategory,
   type BotErrorEvent,
   type Participant,
+  type PublicRoomState,
   type RoomState,
   type ChatMessage
 } from 'shared';
@@ -69,12 +73,16 @@ function toPublicParticipant(participant: Participant): Participant {
   };
 }
 
-function toPublicRoomState(room: RoomState): RoomState {
-  return {
+function toPublicRoomState(room: RoomState): PublicRoomState {
+  return publicRoomStateSchema.parse({
     roomId: room.roomId,
+    ownerDisplayName: room.ownerDisplayName,
+    status: room.status,
+    createdAt: room.createdAt,
+    updatedAt: room.updatedAt,
     participants: room.participants.map(toPublicParticipant),
     messages: room.messages
-  };
+  });
 }
 
 export function attachWebSockets(
@@ -146,7 +154,7 @@ export function attachWebSockets(
       const room = store.addMessage(message);
       io.to(payload.roomId).emit('room:state', toPublicRoomState(room));
 
-      const bot = store.getOwnedBot(payload.roomId, socket.id);
+      const bot = author.ownerUserId ? store.getOwnedBot(payload.roomId, author.ownerUserId) : undefined;
       if (!bot) {
         return;
       }
@@ -161,6 +169,22 @@ export function attachWebSockets(
       }
 
       await runBotReply(lastFailedAttempt);
+    });
+
+    socket.on('room:close', (input) => {
+      const payload = closeRoomPayloadSchema.parse(input);
+      const owner = store.getParticipant(payload.roomId, socket.id);
+      if (!owner?.ownerUserId) {
+        return;
+      }
+
+      const closed = store.closeRoom(payload.roomId, owner.ownerUserId);
+      if (!closed) {
+        return;
+      }
+
+      io.to(payload.roomId).emit('room:closed', roomClosedEventSchema.parse({ roomId: payload.roomId }));
+      io.in(payload.roomId).socketsLeave(payload.roomId);
     });
 
     socket.on('disconnecting', () => {
