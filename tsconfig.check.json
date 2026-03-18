@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "shared": ["./shared/src/index.ts"],
+      "ai-orchestrator": ["./ai-orchestrator/src/index.ts"]
+    }
+  },
+  "include": [
+    "shared/src/**/*.ts",
+    "shared/test/**/*.ts",
+    "ai-orchestrator/src/**/*.ts",
+    "ai-orchestrator/test/**/*.ts",
+    "backend/src/**/*.ts",
+    "backend/test/**/*.ts",
+    "frontend/src/**/*.ts",
+    "frontend/vite.config.ts",
+    "frontend/src/test/**/*.ts",
+    "vitest.config.ts"
+  ]
+}

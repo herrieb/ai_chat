@@ -1,0 +1,25 @@
+{
+  "name": "ai-chatroom",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "ai-orchestrator",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:backend dev:frontend",
+    "dev:backend": "npm --workspace backend run dev",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "build": "npm run build --workspace shared && npm run build --workspace ai-orchestrator && npm run build --workspace backend && npm run build --workspace frontend",
+    "test": "vitest run && npm --workspace frontend run test",
+    "typecheck": "tsc --noEmit -p tsconfig.check.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
