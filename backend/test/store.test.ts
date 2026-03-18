@@ -114,7 +114,7 @@ describe('room store', () => {
     expect(store.listRooms()).toHaveLength(0);
   });
 
-  it('selects a different bot to reply to a bot-authored message', async () => {
+  it('selects an eligible different bot to reply to a bot-authored message', async () => {
     const store = await createStore();
     store.joinRoom('socket-1', {
       roomId: 'lobby',
@@ -146,7 +146,9 @@ describe('room store', () => {
     }
 
     const nextBot = store.getReplyBot('lobby', orbit);
-    expect(nextBot?.displayName).toBe('Echo');
+    expect(nextBot).toBeDefined();
+    expect(nextBot?.id).not.toBe(orbit.id);
+    expect(nextBot?.ownerUserId).not.toBe(orbit.ownerUserId);
   });
 
   it('tracks whether a message already has an ai reply', async () => {

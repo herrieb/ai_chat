@@ -136,6 +136,7 @@ export function attachWebSockets(
         incomingMessage: args.message,
         roomId: args.roomId,
         memories,
+        recentMessages: roomState.messages.slice(-10),
         maxAiResponses: roomState.maxAiResponses
       }).catch((error: unknown) => {
         app.log.error({ error }, 'Bot reply generation failed.');

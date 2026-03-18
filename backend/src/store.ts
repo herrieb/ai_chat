@@ -29,6 +29,15 @@ function createOwnerKey(roomId: string, displayName: string): string {
   return [roomId, displayName].map(slugify).join('-');
 }
 
+function pickRandomParticipant<T>(participants: T[]): T | undefined {
+  if (participants.length === 0) {
+    return undefined;
+  }
+
+  const index = Math.floor(Math.random() * participants.length);
+  return participants[index];
+}
+
 function normalizeRoomState(room: RoomState): RoomState {
   return {
     ...room,
@@ -175,13 +184,16 @@ export class RoomStore {
     );
 
     if (author.kind === 'human' && author.ownerUserId) {
-      return bots.find((bot) => bot.ownerUserId === author.ownerUserId) ?? bots.find((bot) => bot.id !== author.id);
+      const ownedBot = bots.find((bot) => bot.ownerUserId === author.ownerUserId);
+      if (ownedBot) {
+        return ownedBot;
+      }
+
+      return pickRandomParticipant(bots.filter((bot) => bot.id !== author.id));
     }
 
-    return (
-      bots.find((bot) => bot.id !== author.id && bot.ownerUserId !== author.ownerUserId) ??
-      bots.find((bot) => bot.id !== author.id)
-    );
+    const preferredBots = bots.filter((bot) => bot.id !== author.id && bot.ownerUserId !== author.ownerUserId);
+    return pickRandomParticipant(preferredBots.length > 0 ? preferredBots : bots.filter((bot) => bot.id !== author.id));
   }
 
   hasAiReplyToMessage(roomId: string, messageId: string): boolean {
