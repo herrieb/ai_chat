@@ -1,12 +1,13 @@
-import type { JoinRoomPayload, AIProviderId } from '../types.js';
+import type { JoinRoomPayload, AIProviderId, RoomSummary } from '../types.js';
 import { getStoredTheme } from '../theme.js';
-import { checkOllamaHealth, fetchOllamaModels } from '../socket.js';
+import { checkOllamaHealth, fetchOllamaModels, fetchRooms } from '../socket.js';
 
 export interface JoinFormCallbacks {
   onJoin: (payload: JoinRoomPayload) => void;
 }
 
 type OllamaStatus = 'idle' | 'checking' | 'ready' | 'error';
+type RoomMode = 'create' | 'join';
 
 function getFieldValue(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -50,10 +51,41 @@ export function createJoinForm(callbacks: JoinFormCallbacks): HTMLElement {
         <label for="display-name">Your Name</label>
         <input type="text" id="display-name" name="displayName" required placeholder="What should we call you?" autocomplete="nickname">
       </div>
-      <div class="form-field">
-        <label for="room-id">Room</label>
-        <input type="text" id="room-id" name="roomId" required value="lobby" placeholder="lobby" autocomplete="off">
-        <span class="form-hint">Join an existing room or create a new one</span>
+    </section>
+    
+    <section class="form-section">
+      <h2 class="section-title">Room</h2>
+      <div class="room-mode-toggle">
+        <button type="button" class="room-mode-btn room-mode-btn--active" data-mode="create">Create New</button>
+        <button type="button" class="room-mode-btn" data-mode="join">Join Existing</button>
+      </div>
+      
+      <div class="room-create-section" id="room-create-section">
+        <div class="form-field">
+          <label for="room-id">Room Name</label>
+          <input type="text" id="room-id" name="roomId" placeholder="my-awesome-room" autocomplete="off">
+          <span class="form-hint">Choose a unique name for your room</span>
+        </div>
+      </div>
+      
+      <div class="room-browser-section" id="room-browser-section" hidden>
+        <div class="room-browser-header">
+          <span class="room-browser-title">Available Rooms</span>
+          <button type="button" class="room-browser-refresh" id="refresh-rooms-btn" title="Refresh rooms">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 4v6h6M23 20v-6h-6"/>
+              <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+            </svg>
+          </button>
+        </div>
+        <div class="room-browser-list" id="room-browser-list">
+          <div class="room-browser-loading">
+            <span>Loading rooms...</span>
+          </div>
+        </div>
+        <div class="room-browser-footer">
+          <span class="form-hint">Select a room or switch to create a new one</span>
+        </div>
       </div>
     </section>
     
@@ -120,6 +152,12 @@ export function createJoinForm(callbacks: JoinFormCallbacks): HTMLElement {
   const joinBtn = form.querySelector<HTMLButtonElement>('#join-btn')!;
   const btnText = joinBtn.querySelector<HTMLElement>('.btn-text')!;
   const btnLoading = joinBtn.querySelector<HTMLElement>('.btn-loading')!;
+  const roomIdInput = form.querySelector<HTMLInputElement>('#room-id')!;
+  const roomCreateSection = form.querySelector<HTMLElement>('#room-create-section')!;
+  const roomBrowserSection = form.querySelector<HTMLElement>('#room-browser-section')!;
+  const roomBrowserList = form.querySelector<HTMLElement>('#room-browser-list')!;
+  const refreshRoomsBtn = form.querySelector<HTMLButtonElement>('#refresh-rooms-btn')!;
+  const modeButtons = form.querySelectorAll<HTMLButtonElement>('.room-mode-btn');
 
   function updateStatus(status: OllamaStatus, message?: string) {
     indicator.className = `ollama-status__indicator ollama-status__indicator--${status}`;
@@ -149,6 +187,97 @@ export function createJoinForm(callbacks: JoinFormCallbacks): HTMLElement {
       joinBtn.classList.remove('btn-disabled');
     }
   }
+
+  let currentRoomMode: RoomMode = 'create';
+  let selectedRoomId: string | null = null;
+
+  function setRoomMode(mode: RoomMode) {
+    currentRoomMode = mode;
+    selectedRoomId = null;
+    
+    modeButtons.forEach((btn: HTMLButtonElement) => {
+      btn.classList.toggle('room-mode-btn--active', btn.dataset.mode === mode);
+    });
+    
+    if (mode === 'create') {
+      roomCreateSection.hidden = false;
+      roomBrowserSection.hidden = true;
+      roomIdInput.required = true;
+      roomIdInput.value = '';
+    } else {
+      roomCreateSection.hidden = true;
+      roomBrowserSection.hidden = false;
+      roomIdInput.required = false;
+      loadRooms();
+    }
+  }
+
+  function selectRoom(roomId: string) {
+    selectedRoomId = roomId;
+    const items = roomBrowserList.querySelectorAll('.room-item');
+    items.forEach(item => {
+      item.classList.toggle('room-item--selected', item.getAttribute('data-room-id') === roomId);
+    });
+  }
+
+  async function loadRooms() {
+    roomBrowserList.innerHTML = '<div class="room-browser-loading"><span>Loading rooms...</span></div>';
+    
+    try {
+      const response = await fetchRooms();
+      renderRoomList(response.rooms);
+    } catch {
+      roomBrowserList.innerHTML = '<div class="room-browser-empty"><span>Could not load rooms</span></div>';
+    }
+  }
+
+  function renderRoomList(rooms: RoomSummary[]) {
+    if (rooms.length === 0) {
+      roomBrowserList.innerHTML = '<div class="room-browser-empty"><span>No rooms available</span></div>';
+      return;
+    }
+
+    roomBrowserList.innerHTML = '';
+    rooms.forEach(room => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'room-item';
+      item.dataset.roomId = room.roomId;
+      
+      const participantIcons = [];
+      for (let i = 0; i < room.humanCount; i++) participantIcons.push('<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M12 14c-4 0-8 2-8 4v2h16v-2c0-2-4-4-8-4z"/></svg>');
+      for (let i = 0; i < room.botCount; i++) participantIcons.push('<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="3" y="8" width="18" height="12" rx="2"/><circle cx="9" cy="13" r="2"/><circle cx="15" cy="13" r="2"/></svg>');
+      
+      item.innerHTML = `
+        <div class="room-item__info">
+          <span class="room-item__name">${escapeHtml(room.roomId)}</span>
+          <span class="room-item__owner">by ${escapeHtml(room.ownerDisplayName)}</span>
+        </div>
+        <div class="room-item__meta">
+          <span class="room-item__participants">${participantIcons.join('')}</span>
+          <span class="room-item__status room-item__status--${room.status}">${room.status}</span>
+        </div>
+      `;
+      
+      item.addEventListener('click', () => selectRoom(room.roomId));
+      roomBrowserList.appendChild(item);
+    });
+  }
+
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  modeButtons.forEach((btn: HTMLButtonElement) => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode as RoomMode;
+      setRoomMode(mode);
+    });
+  });
+
+  refreshRoomsBtn.addEventListener('click', loadRooms);
 
   async function checkAndFetchModels() {
     const url = urlInput.value.trim();
@@ -221,6 +350,14 @@ export function createJoinForm(callbacks: JoinFormCallbacks): HTMLElement {
       return;
     }
 
+    const finalRoomId = currentRoomMode === 'create' 
+      ? (roomIdInput.value.trim() || 'lobby')
+      : selectedRoomId;
+
+    if (currentRoomMode === 'join' && !finalRoomId) {
+      return;
+    }
+
     btnText.hidden = true;
     btnLoading.hidden = false;
     joinBtn.disabled = true;
@@ -234,7 +371,7 @@ export function createJoinForm(callbacks: JoinFormCallbacks): HTMLElement {
       aiModel: getFieldValue(data, 'aiModel'),
       ollamaUrl: getFieldValue(data, 'ollamaUrl'),
       ollamaToken: getFieldValue(data, 'ollamaToken') || undefined,
-      roomId: getFieldValue(data, 'roomId'),
+      roomId: finalRoomId!,
       theme: getStoredTheme()
     };
 
@@ -245,6 +382,9 @@ export function createJoinForm(callbacks: JoinFormCallbacks): HTMLElement {
       btnLoading.hidden = true;
     }
   });
+
+  setRoomMode('create');
+  loadRooms();
 
   return form;
 }

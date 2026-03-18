@@ -6,9 +6,9 @@ import { createErrorNoticeContainer, createErrorNotice, addErrorNotice, removeEr
 import { createMemoryInspector, showMemoryInspector, hideMemoryInspector } from './components/memory-inspector.js';
 import type { AppState, RoomState, OwnedBotInfo } from './state.js';
 import { createInitialState, updateStateFromRoomState } from './state.js';
-import { joinRoom, sendMessage, onRoomState, onBotError, retryBot } from './socket.js';
+import { joinRoom, sendMessage, onRoomState, onBotError, retryBot, closeRoom, onRoomClosed } from './socket.js';
 import { applyTheme, getStoredTheme } from './theme.js';
-import type { JoinRoomPayload, SendMessagePayload, BotErrorEvent } from './types.js';
+import type { JoinRoomPayload, SendMessagePayload, BotErrorEvent, RoomClosedEvent } from './types.js';
 
 function slugify(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -39,6 +39,7 @@ function init(): void {
 
   const joinScreen = document.createElement('div');
   joinScreen.className = 'join-screen';
+  joinScreen.id = 'join-screen';
   joinScreen.appendChild(
     createJoinForm({
       onJoin: (payload: JoinRoomPayload) => {
@@ -47,9 +48,13 @@ function init(): void {
           memoryKey: deriveMemoryKey(payload.displayName, payload.roomId, payload.botName)
         };
 
+        // CRITICAL: Set currentRoomId BEFORE joinRoom to prevent message-send race
+        currentRoomId = payload.roomId;
+
         state = {
           ...state,
           joined: true,
+          roomId: payload.roomId,
           displayName: payload.displayName,
           ownedBot: ownedBotInfo
         };
@@ -88,7 +93,12 @@ function init(): void {
       }
     },
     onToggleTheme: () => undefined,
-    onOpenMemoryInspector: openMemoryInspector
+    onOpenMemoryInspector: openMemoryInspector,
+    onCloseRoom: () => {
+      if (currentRoomId) {
+        closeRoom({ roomId: currentRoomId });
+      }
+    }
   };
 
   const chatView = createChatView(chatViewCallbacks);
@@ -101,7 +111,7 @@ function init(): void {
   app.appendChild(chatView);
 
   const unsubscribeRoom = onRoomState((room: RoomState) => {
-    state = updateStateFromRoomState(state, room);
+    state = updateStateFromRoomState(state, room, state.displayName);
     currentRoomId = room.roomId;
     if (ownedBotInfo) {
       state.ownedBot = ownedBotInfo;
@@ -126,7 +136,28 @@ function init(): void {
   window.addEventListener('beforeunload', () => {
     unsubscribeRoom();
     unsubscribeBotError();
+    unsubscribeRoomClosed();
   });
+
+  function handleRoomClosed(event: RoomClosedEvent) {
+    hideChatView(chatView);
+    state = createInitialState();
+    currentRoomId = 'lobby';
+    showJoinScreen(joinScreen);
+  }
+
+  const unsubscribeRoomClosed = onRoomClosed(handleRoomClosed);
+}
+
+function showJoinScreen(screen: HTMLElement): void {
+  screen.style.opacity = '1';
+  screen.style.pointerEvents = 'auto';
+  if (!document.body.contains(screen)) {
+    const app = document.querySelector<HTMLDivElement>('#app');
+    if (app) {
+      app.appendChild(screen);
+    }
+  }
 }
 
 function hideJoinScreen(screen: HTMLElement): void {

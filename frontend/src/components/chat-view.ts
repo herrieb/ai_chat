@@ -9,6 +9,7 @@ export interface ChatViewCallbacks {
   onSendMessage: (payload: SendMessagePayload) => void;
   onToggleTheme: () => void;
   onOpenMemoryInspector?: (botName: string, memoryKey: string) => void;
+  onCloseRoom?: () => void;
 }
 
 function queryElement<T extends Element>(container: ParentNode, selector: string): T | null {
@@ -25,6 +26,12 @@ export function createChatView(callbacks: ChatViewCallbacks): HTMLElement {
   header.innerHTML = `
     <h1 class="chat-title">AI Chatroom</h1>
     <span class="room-badge"></span>
+    <button class="close-room-btn" id="close-room-btn" title="Close Room" hidden>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
     <button class="memory-inspector-btn" id="memory-inspector-btn" title="View AI Memory" hidden>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 2a9 9 0 0 0-9 9c0 3.6 3.4 6.2 6 8.3V22l3-3 3 3v-2.7c2.6-2.1 6-4.7 6-8.3a9 9 0 0 0-9-9z"/>
@@ -50,6 +57,13 @@ export function createChatView(callbacks: ChatViewCallbacks): HTMLElement {
   container.appendChild(header);
   container.appendChild(main);
   container.appendChild(composer);
+
+  const closeBtn = container.querySelector<HTMLButtonElement>('#close-room-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      callbacks.onCloseRoom?.();
+    });
+  }
 
   const memoryBtn = container.querySelector<HTMLButtonElement>('#memory-inspector-btn');
   if (memoryBtn && callbacks.onOpenMemoryInspector) {
@@ -79,6 +93,11 @@ export function updateChatView(
   const roomBadge = container.querySelector('.room-badge');
   if (roomBadge) {
     roomBadge.textContent = state.roomId;
+  }
+
+  const closeBtn = container.querySelector<HTMLButtonElement>('#close-room-btn');
+  if (closeBtn) {
+    closeBtn.hidden = !state.isOwner;
   }
 
   const sidebar = queryElement<HTMLElement>(container, '.participant-list');

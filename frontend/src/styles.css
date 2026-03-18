@@ -791,6 +791,30 @@ body {
   color: var(--md-ref-palette-error);
 }
 
+.close-room-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--md-ref-palette-error);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  margin-left: auto;
+}
+
+.close-room-btn:hover {
+  background: color-mix(in srgb, var(--md-ref-palette-error) 15%, transparent);
+}
+
+.close-room-btn:active {
+  background: color-mix(in srgb, var(--md-ref-palette-error) 25%, transparent);
+}
+
 .memory-inspector-btn {
   display: flex;
   align-items: center;
@@ -804,7 +828,7 @@ body {
   color: var(--md-ref-palette-on-surface);
   cursor: pointer;
   transition: background var(--transition-fast);
-  margin-left: auto;
+  margin-left: var(--space-2);
 }
 
 .memory-inspector-btn:hover {
