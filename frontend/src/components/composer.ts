@@ -21,25 +21,5 @@ export function createComposer(callbacks: ComposerCallbacks): HTMLElement {
     return form;
   }
 
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      const content = input.value.trim();
-      if (content) {
-        callbacks.onSend({ roomId: '', content });
-        input.value = '';
-      }
-    }
-  });
-
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const content = input.value.trim();
-    if (content) {
-      callbacks.onSend({ roomId: '', content });
-      input.value = '';
-    }
-  });
-
   return form;
 }
