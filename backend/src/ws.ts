@@ -9,6 +9,7 @@ import {
   publicRoomStateSchema,
   roomClosedEventSchema,
   sendMessagePayloadSchema,
+  typingEventSchema,
   type BotErrorCategory,
   type BotErrorEvent,
   type Participant,
@@ -28,7 +29,8 @@ function makeHumanMessage(socketId: string, displayName: string, roomId: string,
     participantId: socketId,
     displayName,
     content,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    replyDepth: 0
   };
 }
 
@@ -56,6 +58,15 @@ function createBotErrorEvent(error: unknown): BotErrorEvent {
     retryable: true,
     timestamp: new Date().toISOString()
   });
+}
+
+function createTypingEvent(args: {
+  roomId: string;
+  participantId: string;
+  displayName: string;
+  isTyping: boolean;
+}) {
+  return typingEventSchema.parse(args);
 }
 
 interface FailedBotAttempt {
@@ -100,16 +111,42 @@ export function attachWebSockets(
     let lastFailedAttempt: FailedBotAttempt | null = null;
 
     async function runBotReply(args: FailedBotAttempt): Promise<void> {
+      if (store.hasAiReplyToMessage(args.roomId, args.message.id)) {
+        return;
+      }
+
+      const roomState = store.getRoom(args.roomId);
+
+      io.to(args.roomId).emit(
+        'participant:typing',
+        createTypingEvent({
+          roomId: args.roomId,
+          participantId: args.bot.id,
+          displayName: args.bot.displayName,
+          isTyping: true
+        })
+      );
+
       const memories = await memoryStore.getRecentMemories(args.bot.botProfile?.memoryKey ?? args.bot.id);
 
       const replyPlan = await orchestrator.createReplyPlan({
         bot: args.bot,
         incomingMessage: args.message,
         roomId: args.roomId,
-        memories
+        memories,
+        maxAiResponses: roomState.maxAiResponses
       }).catch((error: unknown) => {
         app.log.error({ error }, 'Bot reply generation failed.');
         lastFailedAttempt = args;
+        io.to(args.roomId).emit(
+          'participant:typing',
+          createTypingEvent({
+            roomId: args.roomId,
+            participantId: args.bot.id,
+            displayName: args.bot.displayName,
+            isTyping: false
+          })
+        );
         socket.emit('bot:error', createBotErrorEvent(error));
         return null;
       });
@@ -132,7 +169,32 @@ export function attachWebSockets(
 
       setTimeout(() => {
         const nextRoom = store.addMessage(replyPlan.message);
+        const nextAuthor = store.getParticipant(args.roomId, replyPlan.message.participantId);
+        io.to(args.roomId).emit(
+          'participant:typing',
+          createTypingEvent({
+            roomId: args.roomId,
+            participantId: args.bot.id,
+            displayName: args.bot.displayName,
+            isTyping: false
+          })
+        );
         io.to(args.roomId).emit('room:state', toPublicRoomState(nextRoom));
+
+        if (!nextAuthor) {
+          return;
+        }
+
+        if (store.hasAiReplyToMessage(args.roomId, replyPlan.message.id)) {
+          return;
+        }
+
+        const nextBot = store.getReplyBot(args.roomId, nextAuthor);
+        if (!nextBot) {
+          return;
+        }
+
+        void runBotReply({ bot: nextBot, roomId: args.roomId, message: replyPlan.message });
       }, replyPlan.delayMs);
     }
 
@@ -154,7 +216,7 @@ export function attachWebSockets(
       const room = store.addMessage(message);
       io.to(payload.roomId).emit('room:state', toPublicRoomState(room));
 
-      const bot = author.ownerUserId ? store.getOwnedBot(payload.roomId, author.ownerUserId) : undefined;
+      const bot = store.getReplyBot(payload.roomId, author);
       if (!bot) {
         return;
       }

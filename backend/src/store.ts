@@ -1,6 +1,7 @@
 import {
   BOT_RESPONSE_MAX_DELAY_MS,
   BOT_RESPONSE_MIN_DELAY_MS,
+  DEFAULT_MAX_AI_RESPONSES,
   DEFAULT_ROOM_ID,
   type ChatMessage,
   type JoinRoomPayload,
@@ -82,6 +83,7 @@ export class RoomStore {
       ownerKey: '',
       ownerDisplayName: '',
       status: 'active',
+      maxAiResponses: DEFAULT_MAX_AI_RESPONSES,
       createdAt: now,
       updatedAt: now,
       participants: [],
@@ -116,6 +118,7 @@ export class RoomStore {
     if (!room.ownerKey) {
       room.ownerKey = ownerKey;
       room.ownerDisplayName = payload.displayName;
+      room.maxAiResponses = payload.maxAiResponses ?? DEFAULT_MAX_AI_RESPONSES;
     }
     room.status = 'active';
     room.updatedAt = new Date().toISOString();
@@ -156,6 +159,25 @@ export class RoomStore {
     );
   }
 
+  getReplyBot(roomId: string, author: Participant): Participant | undefined {
+    const bots = this.getRoom(roomId).participants.filter(
+      (participant): participant is Participant => participant.kind === 'bot'
+    );
+
+    if (author.kind === 'human' && author.ownerUserId) {
+      return bots.find((bot) => bot.ownerUserId === author.ownerUserId) ?? bots.find((bot) => bot.id !== author.id);
+    }
+
+    return (
+      bots.find((bot) => bot.id !== author.id && bot.ownerUserId !== author.ownerUserId) ??
+      bots.find((bot) => bot.id !== author.id)
+    );
+  }
+
+  hasAiReplyToMessage(roomId: string, messageId: string): boolean {
+    return this.getRoom(roomId).messages.some((message) => message.replyToMessageId === messageId);
+  }
+
   listRooms(): RoomSummary[] {
     return [...this.rooms.values()]
       .filter((room) => room.status !== 'closed')
@@ -163,6 +185,7 @@ export class RoomStore {
         roomId: room.roomId,
         ownerDisplayName: room.ownerDisplayName,
         status: room.status,
+        maxAiResponses: room.maxAiResponses,
         participantCount: room.participants.length,
         humanCount: room.participants.filter((participant) => participant.kind === 'human').length,
         botCount: room.participants.filter((participant) => participant.kind === 'bot').length,
