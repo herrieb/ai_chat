@@ -259,6 +259,37 @@ body {
   box-shadow: none;
 }
 
+.composer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--md-ref-palette-surface);
+  border-top: 1px solid var(--md-ref-palette-outline-variant);
+}
+
+.composer-input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--md-ref-palette-outline-variant);
+  border-radius: var(--radius-full);
+  background: var(--md-ref-palette-background);
+  color: var(--md-ref-palette-on-surface);
+  caret-color: var(--md-ref-palette-primary);
+  font: inherit;
+  outline: none;
+}
+
+.composer-input::placeholder {
+  color: var(--md-ref-palette-on-surface-variant);
+}
+
+.composer-input:focus {
+  border-color: var(--md-ref-palette-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-ref-palette-primary) 15%, transparent);
+}
+
 .btn-icon {
   width: 40px;
   height: 40px;
