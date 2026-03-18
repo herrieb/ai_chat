@@ -1,5 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
-import type { JoinRoomPayload, RoomState, SendMessagePayload, BotErrorEvent, OllamaHealthResponse, OllamaModelsResponse, MemoryLedgerResponse, BotRetryPayload, OllamaConnectionConfig } from './types.js';
+import type { JoinRoomPayload, RoomState, SendMessagePayload, BotErrorEvent, OllamaHealthResponse, OllamaModelsResponse, MemoryLedgerResponse, BotRetryPayload, OllamaConnectionConfig, CloseRoomPayload, RoomClosedEvent, RoomListResponse } from './types.js';
 
 let socket: Socket | null = null;
 
@@ -78,6 +78,28 @@ export function onBotError(handler: (error: BotErrorEvent) => void): () => void 
   const sock = getSocket();
   sock.on('bot:error', handler);
   return () => sock.off('bot:error', handler);
+}
+
+export function closeRoom(payload: CloseRoomPayload): void {
+  getSocket().emit('room:close', payload);
+}
+
+export function onRoomClosed(handler: (event: RoomClosedEvent) => void): () => void {
+  const sock = getSocket();
+  sock.on('room:closed', handler);
+  return () => sock.off('room:closed', handler);
+}
+
+export async function fetchRooms(): Promise<RoomListResponse> {
+  try {
+    const response = await fetch('/api/rooms');
+    if (!response.ok) {
+      return { rooms: [] };
+    }
+    return await response.json();
+  } catch {
+    return { rooms: [] };
+  }
 }
 
 export function disconnect(): void {

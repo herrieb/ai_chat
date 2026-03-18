@@ -14,6 +14,7 @@ export interface AppState {
   participants: Participant[];
   messages: ChatMessage[];
   ownedBot: OwnedBotInfo | null;
+  isOwner: boolean;
 }
 
 export function createInitialState(): AppState {
@@ -23,15 +24,17 @@ export function createInitialState(): AppState {
     displayName: '',
     participants: [],
     messages: [],
-    ownedBot: null
+    ownedBot: null,
+    isOwner: false
   };
 }
 
-export function updateStateFromRoomState(state: AppState, room: RoomState): AppState {
+export function updateStateFromRoomState(state: AppState, room: RoomState, ownerDisplayName: string): AppState {
   return {
     ...state,
     roomId: room.roomId,
     participants: room.participants,
-    messages: room.messages
+    messages: room.messages,
+    isOwner: room.ownerDisplayName === ownerDisplayName
   };
 }

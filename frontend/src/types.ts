@@ -45,6 +45,10 @@ export interface ChatMessage {
 
 export interface RoomState {
   roomId: string;
+  ownerDisplayName: string;
+  status: RoomStatus;
+  createdAt: string;
+  updatedAt: string;
   participants: Participant[];
   messages: ChatMessage[];
 }
@@ -105,4 +109,29 @@ export interface BotMemory {
   kind: MemoryKind;
   importance: number;
   createdAt: string;
+}
+
+export type RoomStatus = 'active' | 'paused' | 'closed';
+
+export interface RoomSummary {
+  roomId: string;
+  ownerDisplayName: string;
+  status: RoomStatus;
+  participantCount: number;
+  humanCount: number;
+  botCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RoomListResponse {
+  rooms: RoomSummary[];
+}
+
+export interface CloseRoomPayload {
+  roomId: string;
+}
+
+export interface RoomClosedEvent {
+  roomId: string;
 }
