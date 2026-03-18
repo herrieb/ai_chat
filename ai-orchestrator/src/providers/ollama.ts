@@ -17,27 +17,11 @@ export class OllamaProvider implements AIProvider {
       baseUrl: input.baseUrl,
       authToken: input.authToken
     });
-    const response = await fetch(`${connection.baseUrl}/api/generate`, {
-      method: 'POST',
-      headers: this.buildHeaders(connection.authToken),
-      body: JSON.stringify({
-        model: input.model,
-        prompt: `${input.systemPrompt}\n\n${input.userPrompt}`,
-        format: 'json',
-        stream: false
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Ollama request failed with status ${response.status}.`);
+    try {
+      return await this.requestGenerate(connection, input, true);
+    } catch {
+      return this.requestGenerate(connection, input, false);
     }
-
-    const data = (await response.json()) as { response?: string };
-    if (!data.response?.trim()) {
-      throw new Error('Ollama returned an empty response payload.');
-    }
-
-    return parseProviderResponse(data.response);
   }
 
   async ping(config?: OllamaConnectionConfig): Promise<OllamaHealthResponse> {
@@ -121,6 +105,34 @@ export class OllamaProvider implements AIProvider {
       : {
           'Content-Type': 'application/json'
         };
+  }
+
+  private async requestGenerate(
+    connection: OllamaConnectionConfig,
+    input: CompletionInput,
+    structured: boolean
+  ) {
+    const response = await fetch(`${connection.baseUrl}/api/generate`, {
+      method: 'POST',
+      headers: this.buildHeaders(connection.authToken),
+      body: JSON.stringify({
+        model: input.model,
+        prompt: `${input.systemPrompt}\n\n${input.userPrompt}`,
+        ...(structured ? { format: 'json' } : {}),
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama request failed with status ${response.status}.`);
+    }
+
+    const data = (await response.json()) as { response?: string };
+    if (!data.response?.trim()) {
+      throw new Error('Ollama returned an empty response payload.');
+    }
+
+    return parseProviderResponse(data.response);
   }
 
   private toConnectionErrorMessage(error: unknown): string {
