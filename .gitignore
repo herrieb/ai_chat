@@ -1,0 +1,13 @@
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+ai-orchestrator/node_modules/
+shared/node_modules/
+data/
+backend/public/
+backend/dist/
+ai-orchestrator/dist/
+shared/dist/
+frontend/dist/
+*.log
+.DS_Store
