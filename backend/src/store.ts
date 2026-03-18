@@ -5,25 +5,39 @@ import {
   type ChatMessage,
   type JoinRoomPayload,
   type Participant,
+  roomStateSchema,
+  type RoomSummary,
   type RoomState
 } from 'shared';
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+
+import { resolveDataSubdir } from './storage-path.js';
+
+function slugify(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
 
 function createMemoryKey(payload: JoinRoomPayload): string {
   return [payload.roomId || DEFAULT_ROOM_ID, payload.displayName, payload.botName]
-    .map((part) => part.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+    .map(slugify)
     .join('-');
 }
 
-function makeBot(ownerId: string, payload: JoinRoomPayload): Participant {
+function createOwnerKey(roomId: string, displayName: string): string {
+  return [roomId, displayName].map(slugify).join('-');
+}
+
+function makeBot(ownerKey: string, payload: JoinRoomPayload): Participant {
   return {
     id: crypto.randomUUID(),
     displayName: payload.botName,
     kind: 'bot',
-    ownerUserId: ownerId,
+    ownerUserId: ownerKey,
     presence: 'online',
     botProfile: {
       id: crypto.randomUUID(),
-      ownerUserId: ownerId,
+      ownerUserId: ownerKey,
       memoryKey: createMemoryKey(payload),
       provider: payload.aiProvider,
       model: payload.aiModel,
@@ -38,11 +52,12 @@ function makeBot(ownerId: string, payload: JoinRoomPayload): Participant {
   };
 }
 
-function makeHuman(socketId: string, payload: JoinRoomPayload): Participant {
+function makeHuman(socketId: string, ownerKey: string, payload: JoinRoomPayload): Participant {
   return {
     id: socketId,
     displayName: payload.displayName,
     kind: 'human',
+    ownerUserId: ownerKey,
     presence: 'online'
   };
 }
@@ -50,14 +65,25 @@ function makeHuman(socketId: string, payload: JoinRoomPayload): Participant {
 export class RoomStore {
   private readonly rooms = new Map<string, RoomState>();
 
+  constructor(private readonly baseDir = resolveDataSubdir('rooms')) {
+    mkdirSync(this.baseDir, { recursive: true });
+    this.loadRooms();
+  }
+
   getRoom(roomId: string): RoomState {
     const existing = this.rooms.get(roomId);
     if (existing) {
       return existing;
     }
 
+    const now = new Date().toISOString();
     const room: RoomState = {
       roomId,
+      ownerKey: '',
+      ownerDisplayName: '',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
       participants: [],
       messages: []
     };
@@ -68,26 +94,55 @@ export class RoomStore {
   joinRoom(socketId: string, payload: JoinRoomPayload): RoomState {
     const roomId = payload.roomId || DEFAULT_ROOM_ID;
     const room = this.getRoom(roomId);
-    const human = makeHuman(socketId, payload);
-    const bot = makeBot(socketId, payload);
-    room.participants = room.participants.filter(
-      (participant) => participant.id !== socketId && participant.ownerUserId !== socketId
+    if (room.status === 'closed') {
+      throw new Error('Room is closed.');
+    }
+
+    const ownerKey = createOwnerKey(roomId, payload.displayName);
+    const human = makeHuman(socketId, ownerKey, payload);
+    const existingBot = room.participants.find(
+      (participant) => participant.kind === 'bot' && participant.ownerUserId === ownerKey
     );
-    room.participants.push(human, bot);
+
+    room.participants = room.participants.filter(
+      (participant) => participant.id !== socketId && !(participant.kind === 'human' && participant.ownerUserId === ownerKey)
+    );
+
+    if (!existingBot) {
+      room.participants.push(makeBot(ownerKey, payload));
+    }
+
+    room.participants.push(human);
+    if (!room.ownerKey) {
+      room.ownerKey = ownerKey;
+      room.ownerDisplayName = payload.displayName;
+    }
+    room.status = 'active';
+    room.updatedAt = new Date().toISOString();
+    this.saveRoom(room);
     return room;
   }
 
   leave(socketId: string): void {
     for (const room of this.rooms.values()) {
-      room.participants = room.participants.filter(
-        (participant) => participant.id !== socketId && participant.ownerUserId !== socketId
+      const nextParticipants = room.participants.filter(
+        (participant) => !(participant.kind === 'human' && participant.id === socketId)
       );
+
+      if (nextParticipants.length !== room.participants.length) {
+        room.participants = nextParticipants;
+        room.status = room.participants.some((participant) => participant.kind === 'human') ? 'active' : 'paused';
+        room.updatedAt = new Date().toISOString();
+        this.saveRoom(room);
+      }
     }
   }
 
   addMessage(message: ChatMessage): RoomState {
     const room = this.getRoom(message.roomId);
     room.messages = [...room.messages, message].slice(-100);
+    room.updatedAt = new Date().toISOString();
+    this.saveRoom(room);
     return room;
   }
 
@@ -99,5 +154,61 @@ export class RoomStore {
     return this.getRoom(roomId).participants.find(
       (participant) => participant.kind === 'bot' && participant.ownerUserId === ownerUserId
     );
+  }
+
+  listRooms(): RoomSummary[] {
+    return [...this.rooms.values()]
+      .filter((room) => room.status !== 'closed')
+      .map((room) => ({
+        roomId: room.roomId,
+        ownerDisplayName: room.ownerDisplayName,
+        status: room.status,
+        participantCount: room.participants.length,
+        humanCount: room.participants.filter((participant) => participant.kind === 'human').length,
+        botCount: room.participants.filter((participant) => participant.kind === 'bot').length,
+        createdAt: room.createdAt,
+        updatedAt: room.updatedAt
+      }))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  closeRoom(roomId: string, ownerKey: string): RoomState | null {
+    const room = this.rooms.get(roomId);
+    if (!room || room.ownerKey !== ownerKey) {
+      return null;
+    }
+
+    room.status = 'closed';
+    room.updatedAt = new Date().toISOString();
+    room.participants = [];
+    this.rooms.delete(roomId);
+    this.deleteRoomFile(roomId);
+    return room;
+  }
+
+  private loadRooms(): void {
+    for (const entry of readdirSync(this.baseDir)) {
+      if (!entry.endsWith('.json')) {
+        continue;
+      }
+
+      const filePath = path.join(this.baseDir, entry);
+      const parsed = roomStateSchema.safeParse(JSON.parse(readFileSync(filePath, 'utf8')));
+      if (parsed.success) {
+        this.rooms.set(parsed.data.roomId, parsed.data);
+      }
+    }
+  }
+
+  private saveRoom(room: RoomState): void {
+    writeFileSync(this.getRoomFilePath(room.roomId), JSON.stringify(room, null, 2), 'utf8');
+  }
+
+  private deleteRoomFile(roomId: string): void {
+    rmSync(this.getRoomFilePath(roomId), { force: true });
+  }
+
+  private getRoomFilePath(roomId: string): string {
+    return path.join(this.baseDir, `${slugify(roomId)}.json`);
   }
 }
