@@ -35,8 +35,34 @@ export const chatMessageSchema = z.object({
 
 export const roomStateSchema = z.object({
   roomId: z.string().min(1),
+  ownerKey: z.string().min(1),
+  ownerDisplayName: z.string().min(1),
+  status: z.enum(['active', 'paused', 'closed']),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
   participants: z.array(participantSchema),
   messages: z.array(chatMessageSchema)
+});
+
+export const publicRoomStateSchema = z.object({
+  roomId: z.string().min(1),
+  ownerDisplayName: z.string().min(1),
+  status: z.enum(['active', 'paused', 'closed']),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  participants: z.array(participantSchema),
+  messages: z.array(chatMessageSchema)
+});
+
+export const roomSummarySchema = z.object({
+  roomId: z.string().min(1),
+  ownerDisplayName: z.string().min(1),
+  status: z.enum(['active', 'paused', 'closed']),
+  participantCount: z.number().int().nonnegative(),
+  humanCount: z.number().int().nonnegative(),
+  botCount: z.number().int().nonnegative(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
 });
 
 export const joinRoomPayloadSchema = z.object({
@@ -92,6 +118,10 @@ export const botRetryPayloadSchema = z.object({
   roomId: z.string().min(1)
 });
 
+export const closeRoomPayloadSchema = z.object({
+  roomId: z.string().min(1)
+});
+
 export const ollamaHealthResponseSchema = z.object({
   status: z.enum(['ok', 'unavailable']),
   message: z.string().trim().min(1).max(200)
@@ -111,4 +141,12 @@ export const ollamaModelsResponseSchema = z.object({
 export const memoryLedgerResponseSchema = z.object({
   memoryKey: z.string().min(1),
   memories: z.array(botMemorySchema)
+});
+
+export const roomListResponseSchema = z.object({
+  rooms: z.array(roomSummarySchema)
+});
+
+export const roomClosedEventSchema = z.object({
+  roomId: z.string().min(1)
 });

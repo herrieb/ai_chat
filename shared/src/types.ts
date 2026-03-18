@@ -4,6 +4,7 @@ export type AIProviderId = 'ollama';
 export type MemoryKind = 'identity' | 'preference' | 'relationship' | 'goal' | 'fact';
 export type BotErrorCategory = 'ai_unavailable' | 'ai_response_failed';
 export type BotErrorSeverity = 'error' | 'warning';
+export type RoomStatus = 'active' | 'paused' | 'closed';
 
 export interface OllamaConnectionConfig {
   baseUrl: string;
@@ -45,8 +46,34 @@ export interface ChatMessage {
 
 export interface RoomState {
   roomId: string;
+  ownerKey: string;
+  ownerDisplayName: string;
+  status: RoomStatus;
+  createdAt: string;
+  updatedAt: string;
   participants: Participant[];
   messages: ChatMessage[];
+}
+
+export interface PublicRoomState {
+  roomId: string;
+  ownerDisplayName: string;
+  status: RoomStatus;
+  createdAt: string;
+  updatedAt: string;
+  participants: Participant[];
+  messages: ChatMessage[];
+}
+
+export interface RoomSummary {
+  roomId: string;
+  ownerDisplayName: string;
+  status: RoomStatus;
+  participantCount: number;
+  humanCount: number;
+  botCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface JoinRoomPayload {
@@ -114,6 +141,10 @@ export interface BotRetryPayload {
   roomId: string;
 }
 
+export interface CloseRoomPayload {
+  roomId: string;
+}
+
 export interface OllamaHealthResponse {
   status: 'ok' | 'unavailable';
   message: string;
@@ -128,4 +159,12 @@ export interface OllamaModelsResponse {
 export interface MemoryLedgerResponse {
   memoryKey: string;
   memories: BotMemory[];
+}
+
+export interface RoomListResponse {
+  rooms: RoomSummary[];
+}
+
+export interface RoomClosedEvent {
+  roomId: string;
 }

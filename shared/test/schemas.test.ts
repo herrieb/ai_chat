@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { botErrorEventSchema, botMemorySchema, botRetryPayloadSchema, chatMessageSchema, joinRoomPayloadSchema, memoryLedgerResponseSchema, ollamaHealthResponseSchema, ollamaModelsResponseSchema, providerResponseSchema } from '../src/schemas.js';
+import { botErrorEventSchema, botMemorySchema, botRetryPayloadSchema, chatMessageSchema, closeRoomPayloadSchema, joinRoomPayloadSchema, memoryLedgerResponseSchema, ollamaHealthResponseSchema, ollamaModelsResponseSchema, providerResponseSchema, roomClosedEventSchema, roomListResponseSchema } from '../src/schemas.js';
 
 describe('shared schemas', () => {
   it('accepts a valid join payload', () => {
@@ -111,5 +111,28 @@ describe('shared schemas', () => {
     });
 
     expect(result.memories[0]?.fact).toContain('short answers');
+  });
+
+  it('accepts room listing and close payloads', () => {
+    const list = roomListResponseSchema.parse({
+      rooms: [
+        {
+          roomId: 'lobby',
+          ownerDisplayName: 'Taylor',
+          status: 'active',
+          participantCount: 2,
+          humanCount: 1,
+          botCount: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ]
+    });
+    const close = closeRoomPayloadSchema.parse({ roomId: 'lobby' });
+    const closed = roomClosedEventSchema.parse({ roomId: 'lobby' });
+
+    expect(list.rooms[0]?.roomId).toBe('lobby');
+    expect(close.roomId).toBe('lobby');
+    expect(closed.roomId).toBe('lobby');
   });
 });
